@@ -1,15 +1,11 @@
 import os
-from urllib import response
 import requests
 import datetime
-import json
-import csv
 import hashlib
-
-
+import json
 import queries
-import logger
-import response_reader
+
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -25,121 +21,78 @@ load_dotenv()
 # request_day_limit:  7500
 # queues pop every 6
 
+#Read user's api keys from .env file
 dev = os.getenv('DEVID')
 authkey = os.getenv('AUTHKEY')
-endpoint = os.getenv('ENDPOINT')
+endpoint = "https://api.smitegame.com/smiteapi.svc/"
 
+  
+# Create session to the api
+# To create a session you need to create a signature and you will need to create a signature for every API request.
+# A signature is the dev ID, the querry, the authentication key, and the current time written as yyMMddmmss combined then hased with MD5 algorithm.
+# A signature will need to be made for every request but a session needs to made once until it expires.
+#------------------------------------------------------------------------------
+def getTimeStamp():
+    ts = datetime.datetime.strftime(datetime.datetime.utcnow() ,"%Y%m%d%H%M%S")
+    ts = int((ts.split(".")[0]))
+    return ts
 
-timestamp = int(datetime.datetime.strftime( datetime.datetime.utcnow() + datetime.timedelta(minutes=15),"%Y%m%d%H%M%S"))
-queueIDs = {426:"Conquest",435:"Qrena Queue",448:"Joust Queued [3v3]",445:"Assult",466:"Clash",10195:"Under 30 Arena",
-                      504:"Conquest Ranked Controller",451:"Conquest Ranked",434:"MOTD",10193:"Under 30 Conquest",
-                      10197:"Under 30 Joust",459:"Siege 4v4",503:"Joust 3v3 Ranked Controller",441:"Joust Challenege",
-                      468:"Arena [va AI][Medium]",508:"Adventures ch11 Corrupted Arena v3",450:"Joust 3v3 Ranked",
-                      456:"Joust [vs AI][Medium]",461:"Conquest[vs AI][Medium]",502:"Joust Ranked 1v1 Controller",
-                      462:"Arena Tutorial",440:"Joust Ranked[1v1]",10190:"Duel Custom",10152:"S7 Joust Custom",
-                      429:"Conquest Challenge",438:"Arena Challenge",10161:"Conquest [va AI][Hard]",10162:"Joust [vs AI][Very Hard]",
-                      457:"Arena [vs AI][Very Easy]",10158:"Arena [vs AI][Very Hard]",476:"Conquest [vs AI][Easy]",
-                      10177:"Clasic Joust Custom",474:"Joust [vs AI][Very Easy]",467:"Clash Challenge",472:"Arena Practice [Medium]",
-                      443:"Arena Practice [Easy]",10167:"Arena Practice [Hard]",446:"Assult Challenge",478:"Clash [vs AI][Easy]",
-                      469:"Clash [vs AI][Medium]",10160:"Clash [vs AI][Hard]",473:"Joust Practice [Medium]",
-                      10171:"Joust Practice [Hard]",10159:"Assault [vs AI][Hard]",454:"Assault [va AI][Medium]",
-                      10189:"Slash",460:"Siege Challenge",458:"Conquest Practice Easy",475:"Conquest Practice [Medium]",
-                      10170:"Conquest Practice [Hard]",464:"Joust Practice [East]",10151:"Adventures Ch11 Corupted Arena",
-                      479:"Assault Practice [Easy]",477:"Clash Practice [Medium]",470:"Clash Practice [Easy]",
-                      10169:"Clash Practice [Hard]",480:"Assault Practice [Medium]",10168:"Assault Practice [Hard]",
-                      10191:"Slash Custom",10201:"Slash Practice [Easy]",10198:"Slash [vs AI][Easy]",
-                      10199:"Slash [vs AI][Medium]",10200:"Slash [vs AI][Hard]",10203:"Slash Practice [Hard]",
-                      10202:"Slash Practice [Medium]",436:"Basic Tutorial" }
-ranks = {1:"Bronze V",2:"Bronze IV",3:"Bronze III",4:"Bronze II",5:"Bronze I",
-                    6:"Silver V",7:"Silver IV",8:"Silver III",9:"Silver II",10:"Silver I",
-                    11:"Gold V",12:"Gold IV",13:"Gold III",14:"Gold II",15:"Gold I",
-                    16:"Platinum V",17:"Platinum IV",18:"Platinum III",19:"Platinum II",20:"Platinum I",
-                    21:"Diamond V",22:"Diamond IV",23:"Diamond III",24:"Diamond II",25:"Diamond I",
-                    26:"Masters",27:"GrandMasters"}
-portal_ids = {1:"Hirez",5:"Steam",9:"PS4",10:"Xbox",22:"Switch",25:"Discord",28:"Epic"}
-
-def queue_id_conversion_int2str(id):
-    if id in queueIDs:
-        return(queueIDs[id])
-
-def queue_id_conversion_str2int(id):
-    if id in queueIDs.values():
-        return list(queueIDs.keys())[list(queueIDs.values()).index(id)]
-
-def portal_id_conversion_int2str(id):
-    if id in portal_ids.values():
-        return(portal_ids[id])
-
-def portal_id_conversion_str2int(id):
-    if id in portal_ids.values():
-        return list(portal_ids.keys())[list(portal_ids.values()).index(id)]
-
-def ranks_conversion_int2str(rank):
-    if rank in ranks:
-        return ranks[rank]
-
-def ranks_conversion_str2int(rank):
-    if rank in ranks.values():
-        return list(ranks.keys())[list(ranks.values()).index(rank)]
-    
-
-# Create session
 def create_signature(querry):
     signature = dev + querry + authkey + str(getTimeStamp())
     signature = hashlib.md5(signature.encode())
     return signature.hexdigest()
 
 def create_session_id():
-    global timestamp
     signature = create_signature("createsession")
     endpointURL = endpoint + "createsessionJson/" + dev + "/" + signature +"/" + str(getTimeStamp())
-    # r = requests.get(url= endpointURL, verify=False)
     r = requests.get(url= endpointURL)
     data = r.json()
     return(data['session_id'])
-    # global session_id
-    # session_id = data['session_id']
 
+# Ping method to test connection
 def ping():
     url = endpoint + "/pingjson"
     r = requests.get(url=url)
     data = r.json()
     print(data)
+#------------------------------------------------------------
 
 
-def session_expired_check():
-    if int(timestamp) >= int(datetime.datetime.strftime( datetime.datetime.utcnow() + datetime.timedelta(minutes=15),"%Y%m%d%H%M%S")):
-        print(">=" + str(timestamp))
-        create_session_id()
-    else:
-        print(timestamp)
-        
-def getTimeStamp():
-    ts = datetime.datetime.strftime(datetime.datetime.utcnow() ,"%Y%m%d%H%M%S")
-    ts = int((ts.split(".")[0]))
-    return ts
-
-
-def send_querry(querry):
-    URL = endpoint + querry+"Json/" + dev + "/" + create_signature(querry) + "/" + session_id + "/" + str(getTimeStamp()) + "/1233435661"
-    r = requests.get(url=URL)
-    data = r.json()
-    print(json.dumps(data, indent=4))
-    logger.write_match_response(json.dumps(data, indent=4))
-    
-session_id=None
-session_id = create_session_id()
 def main():
+    #Create session ID
+    session_id = create_session_id()
 
-    # queries.get_match_reports_for_league()
-    # response_reader.read_multiple_response()
+    #Check if there is a file holding the match ID's else tell user there is not.
+    if os.path.isfile("matchID.txt"):
+        # If there is a file with match ID's then read the file.
+        with open("matchID.txt","r") as f:
+            lines=f.read().split("\n")
+            matchList = []
+            # Break the match ID's into groups of 10.
+            for i in range(0,len(lines),10):
+                matchList.append(lines[i:i+10])
+                data = []  # Empty list to hold game info
+                # Cycle through the match ID's in groups of 10
+                for alist in matchList:
+                    matchString = alist[0]
+                    # Format the group of 10 ID's so they can be added to the request
+                    for i in alist[1:]:
+                        matchString += "," +i
+                    # This is the actual request for match ID's data. 
+                    URL = endpoint + "getmatchdetailsbatch"+"Json/" + dev + "/" + create_signature("getmatchdetailsbatch") + \
+                            "/" + session_id + "/" + str(getTimeStamp()) + "/" + matchString
+                    r = requests.get(url=URL).json() # r contains a list of dictionaries of match data
+                    print(URL)
+                    # Since the API returns data for up to 10 matches per a request,
+                    # each game's data needs to be added to a variable out side the loop.
+                    for i in r:
+                        data.append(i)
+                    # Then write that variable to a text file.
+                    with open("multiple.txt", "a+") as f:
+                        f.write(json.dumps(data, indent=4))
+    else:
+        print("Missing match ID text file")
 
-
-    #queries.getplayer("Tdog13")
-    queries.get_clanplayers("700337698")
-    #queries.get_getmatchhistory("Tdog13")
-    #queries.getqueuestats("Tdog13","426")
-    
 
 if __name__ == "__main__":
     main()
